@@ -86,6 +86,28 @@ jobs:
       WORK_DIR: ${{ github.workspace }}
 
     steps:
+      - name: "🧹 Free up disk space"
+        run: |
+          echo "Disk space before cleanup:"
+          df -h /
+
+          # Remove large preinstalled toolchains/SDKs we don't need for a kernel build.
+          # These regularly free 25-30GB on ubuntu-latest runners.
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /usr/local/share/powershell
+          sudo rm -rf /usr/local/share/chromium
+          sudo rm -rf /usr/local/lib/node_modules
+          sudo rm -rf /opt/az
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo docker image prune --all --force 2>/dev/null || true
+
+          echo "Disk space after cleanup:"
+          df -h /
+
       - name: "✨ Setup workspace"
         run: |
           mkdir -p ${{ env.KERNEL_LOC_DIR }}
