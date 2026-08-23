@@ -1,7 +1,7 @@
 name: "Build YASK with DroidSpace Support"
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   OUT_DIR: "out"
