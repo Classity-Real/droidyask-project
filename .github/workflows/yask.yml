@@ -1,7 +1,4 @@
-name: "Build YASK with DroidSpace Support"
-
-permissions:
-  contents: write
+name: "Build YASK"
 
 env:
   OUT_DIR: "out"
