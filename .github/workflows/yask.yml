@@ -293,6 +293,56 @@ jobs:
 
           echo "🎉 ReSukiSU installed and SUSFS for GKI android13-5.15 fully integrated!"
 
+      - name: "🌌 Add DroidSpace Support"
+        working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
+        run: |
+          echo "Adding DroidSpace (Droidspaces-OSS) support..."
+
+          # This is a GKI kernel below 6.12 (5.15), so CONFIG_SYSVIPC / CONFIG_IPC_NS
+          # need a kABI-safe patch first or vendor modules (GPU/Camera) will bootloop.
+          # The upstream repo ships 3 candidate patches for different reserved-field
+          # layouts (1_2_3 / 3_4_5 / 6_7_8) — only one will apply cleanly against a
+          # given kernel source, so try each until one succeeds.
+          DS_PATCH_BASE="https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12"
+          DS_APPLIED=0
+
+          for variant in 1_2_3 3_4_5 6_7_8; do
+            patch_name="001.GKI-below-6.12-fix_sysvipc_kabi_${variant}.patch"
+            echo "🔎 Trying kABI fix variant: $variant"
+            curl -fLSs -o "$patch_name" "$DS_PATCH_BASE/$patch_name" || { echo "⚠️ Could not download $patch_name"; continue; }
+
+            if patch -p1 --dry-run < "$patch_name" > /dev/null 2>&1; then
+              patch -p1 < "$patch_name"
+              echo "✅ Applied SYSVIPC kABI fix ($variant)"
+              DS_APPLIED=1
+              rm -f "$patch_name"
+              break
+            else
+              echo "ℹ️ Variant $variant does not match this kernel's reserved layout — skipping"
+              rm -f "$patch_name"
+            fi
+          done
+
+          if [ "$DS_APPLIED" -ne 1 ]; then
+            echo "::warning::No DroidSpace kABI fix patch applied cleanly — DroidSpace configs will still be added, but CONFIG_SYSVIPC/CONFIG_IPC_NS may break vendor module kABI on-device. Verify manually."
+          fi
+
+          # kABI-safe GKI config fragment for DroidSpace support
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          cat >> "$CONFIG_FILE" << 'EOF'
+          # DroidSpace (Droidspaces-OSS) support
+          CONFIG_SYSVIPC=y
+          CONFIG_POSIX_MQUEUE=y
+          CONFIG_IPC_NS=y
+          CONFIG_PID_NS=y
+          CONFIG_DEVTMPFS=y
+          CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+          CONFIG_USER_NS=y
+          CONFIG_NETFILTER_XT_TARGET_REJECT=y
+          EOF
+
+          echo "✅ DroidSpace configs added"
+
       - name: "⚙️ Setup basic configs"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
@@ -429,6 +479,7 @@ jobs:
           • LTO: \`Full\`
           • Optimization: \`-O2\`
           • BBG: \`Enabled\`
+          • DroidSpace: \`Enabled\`
 
           📱 *Supported Devices:*
           • Redmi Note 12 4G/NFC
