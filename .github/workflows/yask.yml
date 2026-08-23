@@ -90,7 +90,7 @@ jobs:
       - name: 📐 Setup SWAP 10GB
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 10
+            swap-size-gb: 20
             
       - name: 📐 Tune Swap
         run: |
@@ -370,7 +370,7 @@ jobs:
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          LTO=full \
+          LTO=thin \
           BUILD_CONFIG=${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki.aarch64 \
           build/build.sh -j$(nproc --all)
 
