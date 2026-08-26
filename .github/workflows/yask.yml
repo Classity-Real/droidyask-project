@@ -470,13 +470,13 @@ jobs:
            • You have a backup of your current kernel
            • Ensure you have a unlocked bootloader
           EOF
-          # Create ZIP
           ZIP_NAME="Anykernel3_YASK-KernelSUNext-AIO-FULL_$(date +'%Y-%m-%d').zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
           
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+          echo "RELEASE_TAG=DroidYASK-$(date +'%Y-%m-%d')-${{ github.run_number }}" >> $GITHUB_ENV
           echo "✅ Package created: $ZIP_NAME"
 
       - name: "⬆️ Upload to GitHub Release"
@@ -485,4 +485,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
         with:
           files: ${{ env.ZIP_NAME }}
-          tag_name: "DroidYASK"
+          tag_name: ${{ env.RELEASE_TAG }}
+
