@@ -463,12 +463,17 @@ jobs:
               • DroidSpace Support                            
                                       
             Info:                                    
-              • Supported Android: 13-16 
               • Supported Devices:                     
-                Redmi Note 12 4G/NFC                  
-                Redmi Note 13 4G/NFC                  
-                Redmi Pad SE                          
-                                         
+                Topaz: Android 13 - 16
+                Tapas: Android 13 - 16
+                Sapphire: Android 13 - 16
+                Sapphiren: Android 13 - 16
+                Creek: Android 13 - 16
+                Xun: Android 13 - 16                          
+            
+            Managers:
+             • KernelSU-Next
+                  
             Please ensure:                          
               • Your device is compatible             
               • You have a backup of your current kernel
