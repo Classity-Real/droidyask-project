@@ -85,7 +85,15 @@ jobs:
           mkdir -p ${{ env.KERNEL_LOC_DIR }}
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           sudo apt-get update -qq
-          sudo apt-get install -y repo rsync aria2
+          sudo apt-get install -y repo rsync aria2 ccache
+
+      - name: "♻️ Cache ccache"
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ matrix.kernel.name }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ matrix.kernel.name }}-
 
       - name: 📐 Setup SWAP 10GB
         uses: pierotofy/set-swap-space@master
@@ -103,36 +111,47 @@ jobs:
           git clone --recursive --branch ${{ env.KERNEL_BRANCH }} \
             ${{ env.KERNEL_REPO }} ${{ env.KERNEL_NAME }} --depth=1
 
-      - name: "📥 Initialize AOSP repo and toolchains"
+      - name: "📥 Initialize AOSP repo"
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          # Initialize AOSP repo
+          # Initialize AOSP repo (shallow — history isn't needed, we only want
+          # the working tree for build scripts + prebuilts layout)
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
           repo sync --optimized-fetch --prune -j8
-          
+
           # Clean up existing repo and common directories
           rm -rf .repo
           rm -rf common
 
-          # Download and setup custom clang toolchain
-          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r547379.tar.gz "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r547379.tar.gz"
-          mkdir -p prebuilts/clang/host/linux-x86/clang-r547379
-          tar -xzf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz -C prebuilts/clang/host/linux-x86/clang-r547379
-          rm -rf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz
-
-          # Remove unused clang for more space
+          # Remove unused default clang toolchains for more space
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
           rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
           rm -rf prebuilts/clang/host/linux-x86/clang-stable
-          
+
           # Update build config constants
           sed -i \
            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
            -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
            ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.constants
-          
+
           # Remove defconfig check (if exists)
           sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki || true
+
+      - name: "♻️ Cache clang toolchain"
+        id: clang-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.WORK_DIR }}/prebuilts/clang/host/linux-x86/clang-r547379
+          key: clang-r547379-v1
+
+      - name: "⬇️ Download custom clang toolchain (cache miss only)"
+        if: steps.clang-cache.outputs.cache-hit != 'true'
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r547379.tar.gz "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r547379.tar.gz"
+          mkdir -p prebuilts/clang/host/linux-x86/clang-r547379
+          tar -xzf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz -C prebuilts/clang/host/linux-x86/clang-r547379
+          rm -rf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz
 
       - name: "🧩 Configure kernel & patches"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
@@ -164,16 +183,16 @@ jobs:
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
-      - name: "🔧 Setup ReSukiSU with SUSFS"
+      - name: "🔧 Setup KernelSU-Next with SUSFS"
         if: matrix.kernel.enable_ksu == true
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-          rm -rf ./KernelSU ./drivers/kernelsu
+          rm -rf ./KernelSU-Next ./drivers/kernelsu
 
-          echo "📦 Installing KSU..."
-          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
-          
-          echo "✔ KSU installed successfully"
+          echo "📦 Installing KernelSU-Next..."
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s stable
+
+          echo "✔ KernelSU-Next installed successfully"
           
           # Clone SUSFS4KSU for kernel patches only (not KSU integration)
           echo "📦 Cloning SUSFS4KSU for kernel patches..."
@@ -206,8 +225,20 @@ jobs:
             echo "⚠️ SUSFS patch failed — copying files manually"
           fi
 
-          echo "🔧 Applying SUSFS -> KernelSU patch..."
+          echo "🔧 Applying SUSFS -> KernelSU-Next patch..."
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+
+          if [ -f "$KSU_PATCH" ] && [ -d "KernelSU-Next" ]; then
+            cp -f "$KSU_PATCH" KernelSU-Next/
+            if (cd KernelSU-Next && patch -p1 < "$(basename "$KSU_PATCH")"); then
+              echo "✅ KernelSU-Next SUSFS integration patch applied"
+            else
+              echo "::warning::KernelSU-Next SUSFS integration patch failed to apply cleanly — verify manually"
+            fi
+            rm -f "KernelSU-Next/$(basename "$KSU_PATCH")"
+          else
+            echo "::warning::Could not find $KSU_PATCH or KernelSU-Next/ directory — skipping integration patch"
+          fi
           
           echo "📄 Forcing SUSFS source injection..."
           
@@ -239,7 +270,7 @@ jobs:
           
           # Create symbolic link for drivers/kernelsu (if needed by build system)
           if [ ! -L "drivers/kernelsu" ]; then
-            ln -sf ../KernelSU drivers/kernelsu
+            ln -sf ../KernelSU-Next drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
           fi
 
@@ -285,7 +316,7 @@ jobs:
           
           echo "✅ KSU configs added"
 
-          echo "🎉 ReSukiSU installed and SUSFS for GKI android13-5.15 fully integrated!"
+          echo "🎉 KernelSU-Next installed and SUSFS for GKI android13-5.15 fully integrated!"
 
       - name: "🌌 Add DroidSpace Support"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
@@ -370,9 +401,16 @@ jobs:
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
+          ccache -M 5G
+          ccache -z
+
           LTO=thin \
+          USE_CCACHE=1 \
+          CCACHE_EXEC=$(command -v ccache) \
           BUILD_CONFIG=${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki.aarch64 \
           build/build.sh -j$(nproc --all)
+
+          ccache -s
 
       - name: "📁 Copy kernel image"
         working-directory: ${{ env.WORK_DIR }}/out/dist
@@ -410,27 +448,22 @@ jobs:
 
           # Create banner
           cat > AnyKernel3/banner << 'EOF'
-          ██╗   ██╗ █████╗ ███████╗██╗   ██╗        
-          ╚██╗ ██╔╝██╔══██╗██╔════╝██║ ██╔╝        
-           ╚████╔╝ ███████║███████║█████╔╝         
-            ╚██╔╝  ██╔══██║╚════██║██╔═██╗         
-             ██║   ██║  ██║███████║██║  ██╗        
-             ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝        
-                                         
-             Yet Another Stock Kernel                
-             by @belowzeroiq                         
+
+             DroidYASS - DroidYetAnotherStockSpace                
+             Original By: @belowzeroiq
+             Maintainer: @graytvhead on telegram
                                                                      
              Features:                               
               • Full LTO + -O2 Optimization           
               • Extra TCP Congestion (BBR, Westwood)  
               • AOSP clang-r547379                    
-              • Non-KSU & ReSukiSU + SUSFS support    
+              • KernelSU-Next + SUSFS support
               • Baseband-Guard Support                
               • Metamodule Support  
               • DroidSpace Support                            
                                       
             Info:                                    
-              • Supported Android: 13-17              
+              • Supported Android: 13-16 
               • Supported Devices:                     
                 Redmi Note 12 4G/NFC                  
                 Redmi Note 13 4G/NFC                  
@@ -439,9 +472,10 @@ jobs:
             Please ensure:                          
               • Your device is compatible             
               • You have a backup of your current kernel
+              • Ensure you have a unlocked bootloader
           EOF
           # Create ZIP
-          ZIP_NAME="Anykernel3_YASK-ReSukiSU-AIO-FULL_$(date +'%Y-%m-%d').zip"
+          ZIP_NAME="Anykernel3_YASK-KernelSUNext-AIO-FULL_$(date +'%Y-%m-%d').zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
@@ -455,74 +489,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
         with:
           files: ${{ env.ZIP_NAME }}
-          tag_name: "YASK-NEXT"
-
-      - name: "📱 Send Telegram Notification"
-        run: |
-          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/YASK-NEXT"
-          BANNER_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_msm-5.15/builder/assets/yask.png"
-
-          if [[ "${{ job.status }}" == "success" ]]; then
-            MESSAGE="✅ *YASK Kernel Released*
-
-          📦 *Build Information:*
-          • Kernel: \`Linux 5.15\`
-          • Android: \`13-17\`
-          • Base: \`GKI & CLO\`
-          • KSU: \`ReSukiSU\`
-          • SUSFS: \`Enabled (GKI A13-5.15)\`
-          • LTO: \`Full\`
-          • Optimization: \`-O2\`
-          • BBG: \`Enabled\`
-          • DroidSpace: \`Enabled\`
-
-          📱 *Supported Devices:*
-          • Redmi Note 12 4G/NFC
-          • Redmi Note 13 4G/NFC
-          • Redmi Pad SE
-
-          📱 *Supported Manager:*
-          • KSU by tiann
-          • MKSU
-          • Rissu-KSU
-          • KowSU
-          • ReSukiSU (Main Root Manager)
-          • SukiSU-Ultra
-
-          🕐 *Build Date:* $(date '+%Y-%m-%d %H:%M:%S UTC')
-          📦 *Package:* \`${{ env.ZIP_NAME }}\`
-
-          ⬇️ [Download Here]($RELEASE_URL)"
-
-            curl -s -X POST \
-              -d chat_id=${{ secrets.TELEGRAM_CHANNEL_ID }} \
-              -d photo="${BANNER_URL}" \
-              --data-urlencode "caption=${MESSAGE}" \
-              -d parse_mode="Markdown" \
-              -d disable_web_page_preview="false" \
-              "https://api.telegram.org/bot${{ secrets.TELEGRAM_YASK_BOT_TOKEN }}/sendPhoto"
-
-          else
-            FAILURE_MSG="❌ *YASK Kernel Build Failed*
-            
-          📦 *Build Information:*
-          • Kernel: \`Linux 5.15\`
-          • Android: \`13-17\`
-          • Base: \`GKI & CLO\`
-          • KSU: \`ReSukiSU\`
-          • SUSFS: \`Enabled (GKI A13-5.15)\`
-          • LTO: \`Full\`
-          • Optimization: \`-O2\`
-          • BBG: \`Enabled\`
-          
-          🕐 *Failed at:* $(date '+%Y-%m-%d %H:%M:%S UTC')
-
-          🔍 Check the [workflow logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
-           
-            curl -s -X POST \
-              -d chat_id=${{ secrets.TELEGRAM_CHANNEL_ID }} \
-              -d photo="${BANNER_URL}" \
-              --data-urlencode "caption=${FAILURE_MSG}" \
-              -d parse_mode="Markdown" \
-              "https://api.telegram.org/bot${{ secrets.TELEGRAM_YASK_BOT_TOKEN }}/sendPhoto"
-          fi
+          tag_name: "DroidYASK"
