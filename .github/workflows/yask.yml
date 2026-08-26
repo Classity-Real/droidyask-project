@@ -12,7 +12,7 @@ on:
         
 jobs:
   build-kernels:
-    name: "🐎 Build YASK ${{ matrix.kernel.name }} kernel"
+    name: "🐎 Build DroidYASS ${{ matrix.kernel.name }} kernel"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
