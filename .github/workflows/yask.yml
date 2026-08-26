@@ -1,4 +1,4 @@
-name: "Build YASK"
+name: "Build DroidYASS"
 
 env:
   OUT_DIR: "out"
