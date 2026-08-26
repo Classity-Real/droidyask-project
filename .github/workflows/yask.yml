@@ -1,4 +1,4 @@
-name: "Build DroidYASS"
+name: "Build YASK"
 
 env:
   OUT_DIR: "out"
@@ -12,7 +12,7 @@ on:
         
 jobs:
   build-kernels:
-    name: "🐎 Build DroidYASS ${{ matrix.kernel.name }} kernel"
+    name: "🐎 Build YASK ${{ matrix.kernel.name }} kernel"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -470,20 +470,34 @@ jobs:
            • You have a backup of your current kernel
            • Ensure you have a unlocked bootloader
           EOF
+          # Create ZIP
           ZIP_NAME="Anykernel3_YASK-KernelSUNext-AIO-FULL_$(date +'%Y-%m-%d').zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
           
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+          # GitHub's Immutable Releases feature permanently locks a tag's assets
+          # once published — reusing a static tag_name across runs fails on the
+          # second and every subsequent run. Give each run its own dated tag.
           echo "RELEASE_TAG=DroidYASK-$(date +'%Y-%m-%d')-${{ github.run_number }}" >> $GITHUB_ENV
           echo "✅ Package created: $ZIP_NAME"
 
-      - name: "⬆️ Upload to GitHub Release"
+      - name: "⬆️ Upload to GitHub Release (draft)"
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
         with:
           files: ${{ env.ZIP_NAME }}
           tag_name: ${{ env.RELEASE_TAG }}
+          draft: true
 
+      - name: "🚀 Publish GitHub Release"
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          # Immutable Releases lock a release (and block asset uploads) the
+          # instant it's published — so the previous step creates it as a
+          # draft (mutable, assets attach fine) and this step publishes it
+          # only after the asset upload has already succeeded.
+          gh release edit "${{ env.RELEASE_TAG }}" --draft=false --repo "${{ github.repository }}"
