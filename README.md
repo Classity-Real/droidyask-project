@@ -1,6 +1,6 @@
-# DroidyYASK (A DroidSpace Compatibilty)
-The YASK Configured Kernel Focused on Droidspace & Root. This contains ReSUISKU or
-APatch (If you want to switch using Direct Installation and choosing "android13")
+# DroidYASS - DroidYetAnotherStockSpace (A DroidSpace Compatibilty)
+The YASK Configured Kernel Focused on Droidspace & Root. This contains KernelSU-Next or
+APatch (If you want to switch using Direct Installation and choosing "android13") 
 # Supported Devices
 - Topaz: Android 13 - 16
 - Tapas: Android 13 - 16
