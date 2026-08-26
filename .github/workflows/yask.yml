@@ -225,21 +225,13 @@ jobs:
             echo "⚠️ SUSFS patch failed — copying files manually"
           fi
 
-          echo "🔧 Applying SUSFS -> KernelSU-Next patch..."
-          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          # NOTE: KernelSU-Next ships with SUSFS hooks built into its source
+          # already (confirmed by "Reversed (or previously applied) patch
+          # detected!" when the vanilla-KernelSU integration patch was tried
+          # here previously) — no separate KSU-side integration patch is
+          # needed or wanted, unlike upstream tiann/KernelSU. Only the
+          # generic kernel patch above and the file copies below are needed.
 
-          if [ -f "$KSU_PATCH" ] && [ -d "KernelSU-Next" ]; then
-            cp -f "$KSU_PATCH" KernelSU-Next/
-            if (cd KernelSU-Next && patch -p1 < "$(basename "$KSU_PATCH")"); then
-              echo "✅ KernelSU-Next SUSFS integration patch applied"
-            else
-              echo "::warning::KernelSU-Next SUSFS integration patch failed to apply cleanly — verify manually"
-            fi
-            rm -f "KernelSU-Next/$(basename "$KSU_PATCH")"
-          else
-            echo "::warning::Could not find $KSU_PATCH or KernelSU-Next/ directory — skipping integration patch"
-          fi
-          
           echo "📄 Forcing SUSFS source injection..."
           
           # Always replace fs/susfs.c
@@ -448,36 +440,35 @@ jobs:
 
           # Create banner
           cat > AnyKernel3/banner << 'EOF'
+          DroidYASS - DroidYetAnotherStockSpace
+          Original By: @belowzeroiq
+          Maintainer: @graytvhead on telegram
 
-             DroidYASS - DroidYetAnotherStockSpace                
-             Original By: @belowzeroiq
-             Maintainer: @graytvhead on telegram
-                                                                     
-             Features:                               
-              • Full LTO + -O2 Optimization           
-              • Extra TCP Congestion (BBR, Westwood)  
-              • AOSP clang-r547379                    
-              • KernelSU-Next + SUSFS support
-              • Baseband-Guard Support                
-              • Metamodule Support  
-              • DroidSpace Support                            
-                                      
-            Info:                                    
-              • Supported Devices:                     
-                Topaz: Android 13 - 16
-                Tapas: Android 13 - 16
-                Sapphire: Android 13 - 16
-                Sapphiren: Android 13 - 16
-                Creek: Android 13 - 16
-                Xun: Android 13 - 16                          
-            
-            Managers:
-             • KernelSU-Next
-                  
-            Please ensure:                          
-              • Your device is compatible             
-              • You have a backup of your current kernel
-              • Ensure you have a unlocked bootloader
+          Features:
+           • Full LTO + -O2 Optimization
+           • Extra TCP Congestion (BBR, Westwood)
+           • AOSP clang-r547379
+           • KernelSU-Next + SUSFS support
+           • Baseband-Guard Support
+           • Metamodule Support
+           • DroidSpace Support
+
+          Info:
+           • Supported Devices:
+             Topaz: Android 13 - 16
+             Tapas: Android 13 - 16
+             Sapphire: Android 13 - 16
+             Sapphiren: Android 13 - 16
+             Creek: Android 13 - 16
+             Xun: Android 13 - 16
+
+          Managers:
+           • KernelSU-Next
+
+          Please ensure:
+           • Your device is compatible
+           • You have a backup of your current kernel
+           • Ensure you have a unlocked bootloader
           EOF
           # Create ZIP
           ZIP_NAME="Anykernel3_YASK-KernelSUNext-AIO-FULL_$(date +'%Y-%m-%d').zip"
