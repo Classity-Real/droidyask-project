@@ -1,4 +1,4 @@
-# DroidYASS - DroidYetAnotherStockSpace (A DroidSpace Compatibilty)
+# DroidYASS - Configured Kernel
 The YASK Configured Kernel Focused on Droidspace & Root. This contains KernelSU-Next or
 APatch (If you want to switch using Direct Installation and choosing "android13") 
 # Supported Devices
