@@ -1,4 +1,4 @@
-name: "Build YASK"
+name: "Build DroidYisky"
 
 env:
   OUT_DIR: "out"
@@ -12,7 +12,7 @@ on:
         
 jobs:
   build-kernels:
-    name: "🐎 Build YASK ${{ matrix.kernel.name }} kernel"
+    name: "Build ${{ matrix.kernel.name }} kernel"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -58,7 +58,7 @@ jobs:
       WORK_DIR: ${{ github.workspace }}
 
     steps:
-      - name: "🧹 Free up disk space"
+      - name: "Free up disk space"
         run: |
           echo "Disk space before cleanup:"
           df -h /
@@ -80,14 +80,14 @@ jobs:
           echo "Disk space after cleanup:"
           df -h /
 
-      - name: "✨ Setup workspace"
+      - name: "Setup workspace"
         run: |
           mkdir -p ${{ env.KERNEL_LOC_DIR }}
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           sudo apt-get update -qq
           sudo apt-get install -y repo rsync aria2 ccache
 
-      - name: "♻️ Cache ccache"
+      - name: "Cache ccache"
         uses: actions/cache@v4
         with:
           path: ~/.ccache
@@ -95,23 +95,23 @@ jobs:
           restore-keys: |
             ccache-${{ matrix.kernel.name }}-
 
-      - name: 📐 Setup SWAP 10GB
+      - name: Setup SWAP 10GB
         uses: pierotofy/set-swap-space@master
         with:
             swap-size-gb: 20
             
-      - name: 📐 Tune Swap
+      - name: Tune Swap
         run: |
             echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
             sudo sysctl -p
 
-      - name: "🌟 Clone kernel source"
+      - name: "Clone kernel source"
         working-directory: ./${{ env.KERNEL_LOC_DIR }}
         run: |
           git clone --recursive --branch ${{ env.KERNEL_BRANCH }} \
             ${{ env.KERNEL_REPO }} ${{ env.KERNEL_NAME }} --depth=1
 
-      - name: "📥 Initialize AOSP repo"
+      - name: "Initialize AOSP repo"
         working-directory: ${{ env.WORK_DIR }}
         run: |
           # Initialize AOSP repo (shallow — history isn't needed, we only want
@@ -137,14 +137,14 @@ jobs:
           # Remove defconfig check (if exists)
           sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki || true
 
-      - name: "♻️ Cache clang toolchain"
+      - name: "Cache clang toolchain"
         id: clang-cache
         uses: actions/cache@v4
         with:
           path: ${{ env.WORK_DIR }}/prebuilts/clang/host/linux-x86/clang-r547379
           key: clang-r547379-v1
 
-      - name: "⬇️ Download custom clang toolchain (cache miss only)"
+      - name: "Download custom clang toolchain (cache miss only)"
         if: steps.clang-cache.outputs.cache-hit != 'true'
         working-directory: ${{ env.WORK_DIR }}
         run: |
@@ -153,7 +153,7 @@ jobs:
           tar -xzf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz -C prebuilts/clang/host/linux-x86/clang-r547379
           rm -rf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz
 
-      - name: "🧩 Configure kernel & patches"
+      - name: "Configure kernel & patches"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
@@ -183,46 +183,46 @@ jobs:
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
-      - name: "🔧 Setup KernelSU-Next with SUSFS"
+      - name: "Setup KernelSU-Next with SUSFS"
         if: matrix.kernel.enable_ksu == true
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           rm -rf ./KernelSU-Next ./drivers/kernelsu
 
-          echo "📦 Installing KernelSU-Next..."
+          echo "Installing KernelSU-Next..."
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s stable
 
           echo "✔ KernelSU-Next installed successfully"
           
           # Clone SUSFS4KSU for kernel patches only (not KSU integration)
-          echo "📦 Cloning SUSFS4KSU for kernel patches..."
+          echo "Cloning SUSFS4KSU for kernel patches..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
 
-          echo "☣️ Applying namespace.c Fake Patch (if applicable)"
+          echo "Applying namespace.c Fake Patch (if applicable)"
           if grep -q '^#include <trace/hooks/blk.h>$' fs/namespace.c; then
             sed -i '/^#include <trace\/hooks\/blk.h>$/d' fs/namespace.c
             NS_FAKE_PATCHED=1
           else
-            echo "ℹ️ blk.h include not present in fs/namespace.c — skipping fake patch"
+            echo "blk.h include not present in fs/namespace.c — skipping fake patch"
             NS_FAKE_PATCHED=0
           fi
 
-          echo "☣️ Applying task_mmu.c Fake Patch (if applicable)"
+          echo "Applying task_mmu.c Fake Patch (if applicable)"
           if grep -q '^#include <trace/hooks/mm.h>$' fs/proc/task_mmu.c; then
             sed -i '/^#include <trace\/hooks\/mm.h>$/d' fs/proc/task_mmu.c
             MM_FAKE_PATCHED=1
           else
-            echo "ℹ️ mm.h include not present in fs/proc/task_mmu.c — skipping fake patch"
+            echo "mm.h include not present in fs/proc/task_mmu.c — skipping fake patch"
             MM_FAKE_PATCHED=0
           fi
           
           SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
           
-          echo "🔧 Applying SUSFS kernel patch..."
+          echo "Applying SUSFS kernel patch..."
           if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
-            echo "✅ SUSFS patch successfully applied"
+            echo "SUSFS patch successfully applied"
           else
-            echo "⚠️ SUSFS patch failed — copying files manually"
+            echo "SUSFS patch failed — copying files manually"
           fi
 
           # NOTE: KernelSU-Next ships with SUSFS hooks built into its source
@@ -232,7 +232,7 @@ jobs:
           # needed or wanted, unlike upstream tiann/KernelSU. Only the
           # generic kernel patch above and the file copies below are needed.
 
-          echo "📄 Forcing SUSFS source injection..."
+          echo "Forcing SUSFS source injection..."
           
           # Always replace fs/susfs.c
           mkdir -p fs
@@ -249,10 +249,10 @@ jobs:
             cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
             echo "✔ Copied include/linux/susfs_def.h"
           else
-            echo "⚠️ susfs_def.h not found in repo"
+            echo "susfs_def.h not found in repo"
           fi
           
-          echo "🔍 Verifying SUSFS files..."
+          echo "Verifying SUSFS files..."
           for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
             if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
           done
@@ -266,7 +266,7 @@ jobs:
             echo "✔ Created drivers/kernelsu symlink"
           fi
 
-          echo "✅ SUSFS build wiring verified"
+          echo "SUSFS build wiring verified"
 
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
@@ -282,35 +282,35 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_MAP=y
           EOF
 
-          echo "↩️ Reverting namespace.c Fake Patch (if applicable)"
+          echo "Reverting namespace.c Fake Patch (if applicable)"
           if [ "$NS_FAKE_PATCHED" = "1" ] && ! grep -q 'trace/hooks/blk.h' fs/namespace.c; then
             if grep -q '^#include "internal.h"$' fs/namespace.c; then
               sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
               echo "✔ Restored blk.h include"
             else
-              echo "⚠️ Anchor #include \"internal.h\" not found — could not restore blk.h include, check fs/namespace.c manually"
+              echo "Anchor #include \"internal.h\" not found — could not restore blk.h include, check fs/namespace.c manually"
             fi
           else
-            echo "ℹ️ Skipping blk.h restore (not fake-patched or already present)"
+            echo "Skipping blk.h restore (not fake-patched or already present)"
           fi
 
-          echo "↩️ Reverting task_mmu.c Fake Patch (if applicable)"
+          echo "Reverting task_mmu.c Fake Patch (if applicable)"
           if [ "$MM_FAKE_PATCHED" = "1" ] && ! grep -q 'trace/hooks/mm.h' fs/proc/task_mmu.c; then
             if grep -q '^#include <linux/pkeys.h>$' fs/proc/task_mmu.c; then
               sed -i '/^#include <linux\/pkeys.h>$/a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
               echo "✔ Restored mm.h include"
             else
-              echo "⚠️ Anchor #include <linux/pkeys.h> not found — could not restore mm.h include, check fs/proc/task_mmu.c manually"
+              echo "Anchor #include <linux/pkeys.h> not found — could not restore mm.h include, check fs/proc/task_mmu.c manually"
             fi
           else
-            echo "ℹ️ Skipping mm.h restore (not fake-patched or already present)"
+            echo "Skipping mm.h restore (not fake-patched or already present)"
           fi
           
-          echo "✅ KSU configs added"
+          echo "KSU configs added"
 
-          echo "🎉 KernelSU-Next installed and SUSFS for GKI android13-5.15 fully integrated!"
+          echo "KernelSU-Next installed and SUSFS for GKI android13-5.15 fully integrated!"
 
-      - name: "🌌 Add DroidSpace Support"
+      - name: "Add DroidSpace Support"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           echo "Adding DroidSpace (Droidspaces-OSS) support..."
@@ -358,7 +358,7 @@ jobs:
           CONFIG_NETFILTER_XT_TARGET_REJECT=y
           EOF
 
-          echo "✅ DroidSpace configs added"
+          echo "DroidSpace configs added"
 
       - name: "⚙️ Setup basic configs"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
@@ -380,9 +380,9 @@ jobs:
           CONFIG_KALLSYMS=y
           EOF
           
-          echo "✅ Basic configs added"
+          echo "Basic configs added"
 
-      - name: "📝 Append custom Makefile line"
+      - name: "Append custom Makefile line"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
          # echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
@@ -404,7 +404,7 @@ jobs:
 
           ccache -s
 
-      - name: "📁 Copy kernel image"
+      - name: "Copy kernel image"
         working-directory: ${{ env.WORK_DIR }}/out/dist
         run: |
           cp Image "${{ env.OUTPUT_NAME }}"
@@ -417,7 +417,7 @@ jobs:
           retention-days: 1
 
   package-kernels:
-    name: "📦 Package Kernels"
+    name: "Package Kernels"
     runs-on: ubuntu-latest
     needs: [build-kernels]
     permissions:
@@ -433,7 +433,7 @@ jobs:
           set -e
 
           # Clone AnyKernel3
-          git clone --depth=1 https://github.com/Classity-Real/anykernel3 -b YASK AnyKernel3
+          git clone --depth=1 https://github.com/topnotchfreaks/AnyKernel3 -b YASK AnyKernel3
 
           # Copy kernel images
           find ./artifacts -name "Image.*" -exec cp {} AnyKernel3/ \;
@@ -481,9 +481,9 @@ jobs:
           # once published — reusing a static tag_name across runs fails on the
           # second and every subsequent run. Give each run its own dated tag.
           echo "RELEASE_TAG=DroidYASK-$(date +'%Y-%m-%d')-${{ github.run_number }}" >> $GITHUB_ENV
-          echo "✅ Package created: $ZIP_NAME"
+          echo "Package created: $ZIP_NAME"
 
-      - name: "⬆️ Upload to GitHub Release (draft)"
+      - name: "Upload to GitHub Release (draft)"
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
