@@ -1,5 +1,5 @@
 # DroidYASS - Configured Kernel
-The YASK Configured Kernel Focused on Droidspace & Root. This contains KernelSU-Next or
+The YASK Configured Kernel Focused on Droidspace & Root. This contains BakaSU or
 APatch (If you want to switch using Direct Installation and choosing "android13") 
 # Supported Devices
 - Topaz: Android 13 - 16
@@ -23,7 +23,7 @@ release the power button and keep the vol up until you see TWRP
 5. Wait for it and choose CLO (or GKI, Your choice)
 6. Choose KSU Only! You are forced to do so
 7. Wait for it and your done! Reboot to finish everything
-8. Install ReSUISKU And your done!
+8. Install BakaSU Manager And your done!
 # Acknowledgements
  - @PhamtomK12 – Original builder
  - @ssocozy – Contributor
