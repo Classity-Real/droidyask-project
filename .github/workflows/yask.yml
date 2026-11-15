@@ -1,4 +1,4 @@
-name: "Build DroidYisky"
+name: "Build AetherKernel"
 
 env:
   OUT_DIR: "out"
@@ -13,7 +13,7 @@ on:
 jobs:
   build-kernels:
     name: "Build ${{ matrix.kernel.name }} kernel"
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-workshop
     strategy:
       fail-fast: false
       matrix:
@@ -24,28 +24,28 @@ jobs:
             repo_url: "https://android.googlesource.com/kernel/common"
             branch: "android13-5.15-lts"
             defconfig: "gki_defconfig"
-            local_version: "-YASK-GKI"
+            local_version: "-AetherOfficial-GKI"
             output_name: "Image.gki.ksu"
             enable_ksu: true
             extra_patches:
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-sign-builds.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-Don-t-append-and-dirty-to-localversion.patch"
-              - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-do-not-ship-full-auto_localversion.patch"
+              - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-do-not-ship-full-auto-localversion.patch"
           - name: "CLO"
             dir: "common_clo"
             repo_name: "clo"
             repo_url: "https://git.codelinaro.org/clo/la/kernel/msm-5.15.git"
             branch: "kernel.lnx.5.15.r1-rel"
             defconfig: "gki_defconfig"
-            local_version: "-YASK-CLO"
+            local_version: "-AetherOfficial-CLO"
             output_name: "Image.clo.ksu"
             enable_ksu: true
             extra_patches:
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-sign-builds.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-Don-t-append-and-dirty-to-localversion.patch"
-              - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-do-not-ship-full-auto_localversion.patch"
+              - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-do-not-ship-full-auto-localversion.patch"
 
     env:
       KERNEL_LOC_DIR: ${{ matrix.kernel.dir }}
@@ -241,6 +241,7 @@ jobs:
           
           # Always replace include/linux/susfs.h
           mkdir -p include/linux
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h 2>/dev/null || true
           cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
           echo "✔ Copied include/linux/susfs.h"
           
@@ -418,7 +419,7 @@ jobs:
 
   package-kernels:
     name: "Package Kernels"
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-workshop
     needs: [build-kernels]
     permissions:
       contents: write
@@ -440,9 +441,8 @@ jobs:
 
           # Create banner
           cat > AnyKernel3/banner << 'EOF'
-          DroidYASS - DroidYetAnotherStockSpace
-          Original By: @belowzeroiq
-          Maintainer: @graytvhead on telegram
+          AetherKernel
+          Maintainer: @Classity_Real
 
           Features:
            • Full LTO + -O2 Optimization
@@ -471,7 +471,7 @@ jobs:
            • Ensure you have a unlocked bootloader
           EOF
           # Create ZIP
-          ZIP_NAME="Anykernel3_YASK-BakaSU-AIO-FULL_$(date +'%Y-%m-%d').zip"
+          ZIP_NAME="Anykernel3_AetherOfficial-BakaSU-AIO-FULL_$(date +'%Y-%m-%d').zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
@@ -480,7 +480,7 @@ jobs:
           # GitHub's Immutable Releases feature permanently locks a tag's assets
           # once published — reusing a static tag_name across runs fails on the
           # second and every subsequent run. Give each run its own dated tag.
-          echo "RELEASE_TAG=DroidYASK-$(date +'%Y-%m-%d')-${{ github.run_number }}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=AetherKernel-$(date +'%Y-%m-%d')-${{ github.run_number }}" >> $GITHUB_ENV
           echo "Package created: $ZIP_NAME"
 
       - name: "Upload to GitHub Release (draft)"
