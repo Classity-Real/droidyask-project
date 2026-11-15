@@ -1,28 +1,22 @@
 # AetherKernel
 
-AetherOfficial configured kernel focused on DroidSpace & root. Built with BakaSU (or APatch if you switch via Direct Installation and choose "android13").
+AetherOfficial configured kernel for **Xiaomi Pad SE (xun)**, focused on DroidSpace & root. Built strictly with BakaSU.
 
-## Supported Devices
-- Topaz: Android 13 - 16
-- Tapas: Android 13 - 16
-- Sapphire: Android 13 - 16
-- Sapphiren: Android 13 - 16
-- Creek: Android 13 - 16
-- Xun: Android 13 - 16
+## Supported Device
+- **Xiaomi Pad SE (xun)** — Android 13 - 16
 
 ## Installation
 Requirements:
- - Compatible Device
+ - Xiaomi Pad SE (xun)
  - TWRP Installed
- - PC (Or mobile if you have TWRP installed already)
- - Brain
- - ADB (If on PC)
+ - PC (or the tablet itself if TWRP is already installed)
+ - ADB (if using PC)
 
-1. Download the AnyKernel.zip from Releases on the right bar
-2. Go to TWRP by turning off your device, hold vol up and power and once the logo appears release the power button and keep the vol up until you see TWRP
-3. Go to Advanced > Sideload > Swipe to proceed (or on mobile: Install → pick the anykernel.zip)
+1. Download the AnyKernel.zip from Releases
+2. Boot to TWRP (power off → hold Vol Up + Power, release Power when logo appears, keep holding Vol Up)
+3. Advanced → Sideload → Swipe to start (or Install → select the zip on-device)
 4. On PC: `adb sideload <anykernel.zip>`
-5. Wait for it and choose CLO (or GKI)
+5. Choose CLO or GKI
 6. Choose KSU Only
 7. Reboot when finished
 8. Install BakaSU Manager
