@@ -149,12 +149,8 @@ jobs:
         working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           echo "Adding BBG..."
-          # setup.sh does the real work then hits a broken awk when printing
-          # suggested defconfig lines. Ignore that so the step does not fail.
           wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash || true
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          # Modern GKI already uses LSM blob management; BBG setup skips the
-          # old selinux default patch itself. Best-effort sed for older trees.
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig || true
 
       - name: "Setup BakaSU with SUSFS"
@@ -369,7 +365,8 @@ jobs:
           retention-days: 1
 
   package-kernels:
-    name: "Package Kernels"n    runs-on: namespace-profile-workshop
+    name: "Package Kernels"
+    runs-on: namespace-profile-workshop
     needs: [build-kernels]
     permissions:
       contents: write
