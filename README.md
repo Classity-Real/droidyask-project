@@ -1,30 +1,36 @@
 # AetherKernel
 
-AetherOfficial configured kernel for **Xiaomi Pad SE (xun)**, focused on DroidSpace & root. Built strictly with BakaSU.
+Custom kernel for Xiaomi Pad SE (xun).
+Built with BakaSU and SUSFS, plus DroidSpace support.
 
-## Supported Device
-- **Xiaomi Pad SE (xun)** — Android 13 - 16
+## Device
 
-## Installation
-Requirements:
- - Xiaomi Pad SE (xun)
- - TWRP Installed
- - PC (or the tablet itself if TWRP is already installed)
- - ADB (if using PC)
+Xiaomi Pad SE (xun)  
+Android 13 through 16
 
-1. Download the AnyKernel.zip from Releases
-2. Boot to TWRP (power off → hold Vol Up + Power, release Power when logo appears, keep holding Vol Up)
-3. Advanced → Sideload → Swipe to start (or Install → select the zip on-device)
-4. On PC: `adb sideload <anykernel.zip>`
-5. Choose CLO or GKI
-6. Choose KSU Only
-7. Reboot when finished
-8. Install BakaSU Manager
+## What you need
 
-## Acknowledgements
- - @PhamtomK12 – Original builder
- - @ssocozy – Contributor
- - @NVG-064 – Contributor
- - @ShirkNeko – SUSFS integration
- - @thewildjames – Wild-KSU
- - @Classity_Real – DroidSpace Integration
+- Xiaomi Pad SE
+- Unlocked bootloader
+- TWRP
+- ADB (if flashing from a PC)
+
+## Install
+
+1. Grab the AnyKernel zip from Releases.
+2. Boot into TWRP.
+3. Sideload the zip (`adb sideload <zip>`) or install it from the tablet.
+4. When prompted, pick CLO or GKI, then KSU Only.
+5. Reboot.
+6. Install the BakaSU manager.
+
+Make a backup before flashing.
+
+## Credits
+
+- PhamtomK12 - original builder
+- ssocozy
+- NVG-064
+- ShirkNeko - SUSFS
+- thewildjames - Wild-KSU
+- Classity_Real - DroidSpace integration
