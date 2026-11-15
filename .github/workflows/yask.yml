@@ -58,26 +58,6 @@ jobs:
       WORK_DIR: ${{ github.workspace }}
 
     steps:
-      - name: "Free up disk space"
-        run: |
-          echo "Disk space before cleanup:"
-          df -h /
-
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /usr/local/.ghcup
-          sudo rm -rf /usr/local/share/powershell
-          sudo rm -rf /usr/local/share/chromium
-          sudo rm -rf /usr/local/lib/node_modules
-          sudo rm -rf /opt/az
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo docker image prune --all --force 2>/dev/null || true
-
-          echo "Disk space after cleanup:"
-          df -h /
-
       - name: "Setup workspace"
         run: |
           mkdir -p ${{ env.KERNEL_LOC_DIR }}
@@ -164,7 +144,7 @@ jobs:
             [ -n "$p" ] && apply_patch "$p"
           done
 
-      - name: "🔧 Add BBG Support (KSU variant only)"
+      - name: "Add BBG Support (KSU variant only)"
         if: matrix.kernel.enable_ksu == true
         working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
@@ -182,7 +162,7 @@ jobs:
           echo "Installing BakaSU..."
           curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/main/kernel/setup.sh" | bash
 
-          echo "✔ BakaSU installed successfully"
+          echo "BakaSU installed successfully"
           
           echo "Cloning SUSFS4KSU for kernel patches..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
@@ -218,29 +198,29 @@ jobs:
           
           mkdir -p fs
           cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
-          echo "✔ Copied fs/susfs.c"
+          echo "Copied fs/susfs.c"
           
           mkdir -p include/linux
           cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
-          echo "✔ Copied include/linux/susfs.h"
+          echo "Copied include/linux/susfs.h"
           
           if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
             cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
-            echo "✔ Copied include/linux/susfs_def.h"
+            echo "Copied include/linux/susfs_def.h"
           else
             echo "susfs_def.h not found in repo"
           fi
           
           echo "Verifying SUSFS files..."
           for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
-            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
+            if [ -f "$f" ]; then echo "Found: $f"; else echo "Missing: $f"; fi
           done
           
           rm -rf susfs4ksu
           
           if [ ! -L "drivers/kernelsu" ]; then
             ln -sf ../KernelSU/kernel drivers/kernelsu
-            echo "✔ Created drivers/kernelsu symlink"
+            echo "Created drivers/kernelsu symlink"
           fi
 
           echo "SUSFS build wiring verified"
@@ -263,7 +243,7 @@ jobs:
           if [ "$NS_FAKE_PATCHED" = "1" ] && ! grep -q 'trace/hooks/blk.h' fs/namespace.c; then
             if grep -q '^#include "internal.h"$' fs/namespace.c; then
               sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
-              echo "✔ Restored blk.h include"
+              echo "Restored blk.h include"
             else
               echo "Anchor #include \"internal.h\" not found — could not restore blk.h include"
             fi
@@ -275,7 +255,7 @@ jobs:
           if [ "$MM_FAKE_PATCHED" = "1" ] && ! grep -q 'trace/hooks/mm.h' fs/proc/task_mmu.c; then
             if grep -q '^#include <linux/pkeys.h>$' fs/proc/task_mmu.c; then
               sed -i '/^#include <linux\\/pkeys.h>$/a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
-              echo "✔ Restored mm.h include"
+              echo "Restored mm.h include"
             else
               echo "Anchor #include <linux/pkeys.h> not found — could not restore mm.h include"
             fi
@@ -297,17 +277,17 @@ jobs:
 
           for variant in 1_2_3 3_4_5 6_7_8; do
             patch_name="001.GKI-below-6.12-fix_sysvipc_kabi_${variant}.patch"
-            echo "🔎 Trying kABI fix variant: $variant"
-            curl -fLSs -o "$patch_name" "$DS_PATCH_BASE/$patch_name" || { echo "⚠️ Could not download $patch_name"; continue; }
+            echo "Trying kABI fix variant: $variant"
+            curl -fLSs -o "$patch_name" "$DS_PATCH_BASE/$patch_name" || { echo "Could not download $patch_name"; continue; }
 
             if patch -p1 --dry-run < "$patch_name" > /dev/null 2>&1; then
               patch -p1 < "$patch_name"
-              echo "✅ Applied SYSVIPC kABI fix ($variant)"
+              echo "Applied SYSVIPC kABI fix ($variant)"
               DS_APPLIED=1
               rm -f "$patch_name"
               break
             else
-              echo "ℹ️ Variant $variant does not match this kernel's reserved layout — skipping"
+              echo "Variant $variant does not match this kernel's reserved layout — skipping"
               rm -f "$patch_name"
             fi
           done
@@ -331,7 +311,7 @@ jobs:
 
           echo "DroidSpace configs added"
 
-      - name: "⚙️ Setup basic configs"
+      - name: "Setup basic configs"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           CONFIG_FILE="./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
@@ -358,7 +338,7 @@ jobs:
          echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
          echo "Custom Makefile line added successfully"
     
-      - name: "🔨 Build kernel"
+      - name: "Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
           ccache -M 5G
@@ -377,7 +357,7 @@ jobs:
         run: |
           cp Image "${{ env.OUTPUT_NAME }}"
 
-      - name: "📤 Upload kernel artifact"
+      - name: "Upload kernel artifact"
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.kernel.name }}-kernel
@@ -391,12 +371,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: "📥 Download kernel artifacts"
+      - name: "Download kernel artifacts"
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts/
 
-      - name: "📦 Create release package"
+      - name: "Create release package"
         run: |
           set -e
 
@@ -448,7 +428,7 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           draft: true
 
-      - name: "🚀 Publish GitHub Release"
+      - name: "Publish GitHub Release"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
