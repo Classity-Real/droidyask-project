@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.svg" alt="AetherKernel" width="100%" />
+</p>
+
 # AetherKernel
 
 Custom kernel for Xiaomi Pad SE (xun).
