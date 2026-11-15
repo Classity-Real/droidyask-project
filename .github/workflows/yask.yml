@@ -135,7 +135,7 @@ jobs:
            ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.constants
 
           # Remove defconfig check (if exists)
-          sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki || true
+          sed -i '/^POST_DEFCONFIG_CMDS=\"check_defconfig\"/d' ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki || true
 
       - name: "Cache clang toolchain"
         id: clang-cache
@@ -183,16 +183,16 @@ jobs:
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
-      - name: "Setup KernelSU-Next with SUSFS"
+      - name: "Setup BakaSU with SUSFS"
         if: matrix.kernel.enable_ksu == true
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-          rm -rf ./KernelSU-Next ./drivers/kernelsu
+          rm -rf ./KernelSU ./KernelSU-Next ./drivers/kernelsu
 
-          echo "Installing KernelSU-Next..."
-          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s stable
+          echo "Installing BakaSU..."
+          curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/main/kernel/setup.sh" | bash
 
-          echo "✔ KernelSU-Next installed successfully"
+          echo "✔ BakaSU installed successfully"
           
           # Clone SUSFS4KSU for kernel patches only (not KSU integration)
           echo "Cloning SUSFS4KSU for kernel patches..."
@@ -200,7 +200,7 @@ jobs:
 
           echo "Applying namespace.c Fake Patch (if applicable)"
           if grep -q '^#include <trace/hooks/blk.h>$' fs/namespace.c; then
-            sed -i '/^#include <trace\/hooks\/blk.h>$/d' fs/namespace.c
+            sed -i '/^#include <trace\\/hooks\\/blk.h>$/d' fs/namespace.c
             NS_FAKE_PATCHED=1
           else
             echo "blk.h include not present in fs/namespace.c — skipping fake patch"
@@ -209,7 +209,7 @@ jobs:
 
           echo "Applying task_mmu.c Fake Patch (if applicable)"
           if grep -q '^#include <trace/hooks/mm.h>$' fs/proc/task_mmu.c; then
-            sed -i '/^#include <trace\/hooks\/mm.h>$/d' fs/proc/task_mmu.c
+            sed -i '/^#include <trace\\/hooks\\/mm.h>$/d' fs/proc/task_mmu.c
             MM_FAKE_PATCHED=1
           else
             echo "mm.h include not present in fs/proc/task_mmu.c — skipping fake patch"
@@ -225,7 +225,7 @@ jobs:
             echo "SUSFS patch failed — copying files manually"
           fi
 
-          # NOTE: KernelSU-Next ships with SUSFS hooks built into its source
+          # NOTE: BakaSU ships with SUSFS hooks built into its source
           # already (confirmed by "Reversed (or previously applied) patch
           # detected!" when the vanilla-KernelSU integration patch was tried
           # here previously) — no separate KSU-side integration patch is
@@ -262,7 +262,7 @@ jobs:
           
           # Create symbolic link for drivers/kernelsu (if needed by build system)
           if [ ! -L "drivers/kernelsu" ]; then
-            ln -sf ../KernelSU-Next drivers/kernelsu
+            ln -sf ../KernelSU/kernel drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
           fi
 
@@ -297,7 +297,7 @@ jobs:
           echo "Reverting task_mmu.c Fake Patch (if applicable)"
           if [ "$MM_FAKE_PATCHED" = "1" ] && ! grep -q 'trace/hooks/mm.h' fs/proc/task_mmu.c; then
             if grep -q '^#include <linux/pkeys.h>$' fs/proc/task_mmu.c; then
-              sed -i '/^#include <linux\/pkeys.h>$/a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
+              sed -i '/^#include <linux\\/pkeys.h>$/a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
               echo "✔ Restored mm.h include"
             else
               echo "Anchor #include <linux/pkeys.h> not found — could not restore mm.h include, check fs/proc/task_mmu.c manually"
@@ -308,7 +308,7 @@ jobs:
           
           echo "KSU configs added"
 
-          echo "KernelSU-Next installed and SUSFS for GKI android13-5.15 fully integrated!"
+          echo "BakaSU installed and SUSFS for GKI android13-5.15 fully integrated!"
 
       - name: "Add DroidSpace Support"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
@@ -448,7 +448,7 @@ jobs:
            • Full LTO + -O2 Optimization
            • Extra TCP Congestion (BBR, Westwood)
            • AOSP clang-r547379
-           • KernelSU-Next + SUSFS support
+           • BakaSU + SUSFS support
            • Baseband-Guard Support
            • Metamodule Support
            • DroidSpace Support
@@ -463,7 +463,7 @@ jobs:
              Xun: Android 13 - 16
 
           Managers:
-           • KernelSU-Next
+           • BakaSU
 
           Please ensure:
            • Your device is compatible
@@ -471,7 +471,7 @@ jobs:
            • Ensure you have a unlocked bootloader
           EOF
           # Create ZIP
-          ZIP_NAME="Anykernel3_YASK-KernelSUNext-AIO-FULL_$(date +'%Y-%m-%d').zip"
+          ZIP_NAME="Anykernel3_YASK-BakaSU-AIO-FULL_$(date +'%Y-%m-%d').zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
