@@ -173,7 +173,7 @@ jobs:
 
           echo "Applying namespace.c Fake Patch (if applicable)"
           if grep -q '^#include <trace/hooks/blk.h>$' fs/namespace.c; then
-            sed -i '/^#include <trace\\/hooks\\/blk.h>$/d' fs/namespace.c
+            sed -i '\|^#include <trace/hooks/blk.h>$|d' fs/namespace.c
             NS_FAKE_PATCHED=1
           else
             echo "blk.h include not present in fs/namespace.c — skipping fake patch"
@@ -182,7 +182,7 @@ jobs:
 
           echo "Applying task_mmu.c Fake Patch (if applicable)"
           if grep -q '^#include <trace/hooks/mm.h>$' fs/proc/task_mmu.c; then
-            sed -i '/^#include <trace\\/hooks\\/mm.h>$/d' fs/proc/task_mmu.c
+            sed -i '\|^#include <trace/hooks/mm.h>$|d' fs/proc/task_mmu.c
             MM_FAKE_PATCHED=1
           else
             echo "mm.h include not present in fs/proc/task_mmu.c — skipping fake patch"
@@ -258,7 +258,7 @@ jobs:
           echo "Reverting task_mmu.c Fake Patch (if applicable)"
           if [ "$MM_FAKE_PATCHED" = "1" ] && ! grep -q 'trace/hooks/mm.h' fs/proc/task_mmu.c; then
             if grep -q '^#include <linux/pkeys.h>$' fs/proc/task_mmu.c; then
-              sed -i '/^#include <linux\\/pkeys.h>$/a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
+              sed -i '\|^#include <linux/pkeys.h>$|a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
               echo "Restored mm.h include"
             else
               echo "Anchor #include <linux/pkeys.h> not found — could not restore mm.h include"
@@ -369,8 +369,7 @@ jobs:
           retention-days: 1
 
   package-kernels:
-    name: "Package Kernels"
-    runs-on: namespace-profile-workshop
+    name: "Package Kernels"n    runs-on: namespace-profile-workshop
     needs: [build-kernels]
     permissions:
       contents: write
