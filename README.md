@@ -2,8 +2,6 @@
   <img src="assets/homeworkdirartifactsaetherkernel_banner-1.png" alt="AetherKernel" width="100%" />
 </p>
 
-# AetherKernel
-
 Custom kernel for Xiaomi Pad SE (xun).
 Built with BakaSU and SUSFS, plus DroidSpace support.
 
