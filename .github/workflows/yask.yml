@@ -63,8 +63,6 @@ jobs:
           echo "Disk space before cleanup:"
           df -h /
 
-          # Remove large preinstalled toolchains/SDKs we don't need for a kernel build.
-          # These regularly free 25-30GB on ubuntu-latest runners.
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
@@ -114,27 +112,21 @@ jobs:
       - name: "Initialize AOSP repo"
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          # Initialize AOSP repo (shallow — history isn't needed, we only want
-          # the working tree for build scripts + prebuilts layout)
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
           repo sync --optimized-fetch --prune -j8
 
-          # Clean up existing repo and common directories
           rm -rf .repo
           rm -rf common
 
-          # Remove unused default clang toolchains for more space
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
           rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
           rm -rf prebuilts/clang/host/linux-x86/clang-stable
 
-          # Update build config constants
           sed -i \
            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
            -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
            ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.constants
 
-          # Remove defconfig check (if exists)
           sed -i '/^POST_DEFCONFIG_CMDS=\"check_defconfig\"/d' ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki || true
 
       - name: "Cache clang toolchain"
@@ -160,7 +152,6 @@ jobs:
           echo "CONFIG_LOCALVERSION=\"${{ env.LOCAL_VERSION }}-${{ env.BUILD_TIME }}\"" >> "$CONFIG_FILE"
           echo "CONFIG_LOCALVERSION_AUTO=n" >> "$CONFIG_FILE"
 
-          # Helper
           apply_patch() {
             local url="$1"
             local file=$(basename "$url")
@@ -169,7 +160,6 @@ jobs:
             rm -f "$file"
           }
 
-          # Apply patches
           echo '${{ toJSON(matrix.kernel.extra_patches) }}' | jq -r '.[]' | while read p; do
             [ -n "$p" ] && apply_patch "$p"
           done
@@ -194,7 +184,6 @@ jobs:
 
           echo "✔ BakaSU installed successfully"
           
-          # Clone SUSFS4KSU for kernel patches only (not KSU integration)
           echo "Cloning SUSFS4KSU for kernel patches..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
 
@@ -225,27 +214,16 @@ jobs:
             echo "SUSFS patch failed — copying files manually"
           fi
 
-          # NOTE: BakaSU ships with SUSFS hooks built into its source
-          # already (confirmed by "Reversed (or previously applied) patch
-          # detected!" when the vanilla-KernelSU integration patch was tried
-          # here previously) — no separate KSU-side integration patch is
-          # needed or wanted, unlike upstream tiann/KernelSU. Only the
-          # generic kernel patch above and the file copies below are needed.
-
           echo "Forcing SUSFS source injection..."
           
-          # Always replace fs/susfs.c
           mkdir -p fs
           cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
           echo "✔ Copied fs/susfs.c"
           
-          # Always replace include/linux/susfs.h
           mkdir -p include/linux
-          cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h 2>/dev/null || true
           cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
           echo "✔ Copied include/linux/susfs.h"
           
-          # Also install missing susfs_def.h
           if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
             cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
             echo "✔ Copied include/linux/susfs_def.h"
@@ -258,10 +236,8 @@ jobs:
             if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
           done
           
-          # Clean up SUSFS repo (we only needed kernel patches, not KSU integration)
           rm -rf susfs4ksu
           
-          # Create symbolic link for drivers/kernelsu (if needed by build system)
           if [ ! -L "drivers/kernelsu" ]; then
             ln -sf ../KernelSU/kernel drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
@@ -289,7 +265,7 @@ jobs:
               sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
               echo "✔ Restored blk.h include"
             else
-              echo "Anchor #include \"internal.h\" not found — could not restore blk.h include, check fs/namespace.c manually"
+              echo "Anchor #include \"internal.h\" not found — could not restore blk.h include"
             fi
           else
             echo "Skipping blk.h restore (not fake-patched or already present)"
@@ -301,7 +277,7 @@ jobs:
               sed -i '/^#include <linux\\/pkeys.h>$/a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
               echo "✔ Restored mm.h include"
             else
-              echo "Anchor #include <linux/pkeys.h> not found — could not restore mm.h include, check fs/proc/task_mmu.c manually"
+              echo "Anchor #include <linux/pkeys.h> not found — could not restore mm.h include"
             fi
           else
             echo "Skipping mm.h restore (not fake-patched or already present)"
@@ -316,11 +292,6 @@ jobs:
         run: |
           echo "Adding DroidSpace (Droidspaces-OSS) support..."
 
-          # This is a GKI kernel below 6.12 (5.15), so CONFIG_SYSVIPC / CONFIG_IPC_NS
-          # need a kABI-safe patch first or vendor modules (GPU/Camera) will bootloop.
-          # The upstream repo ships 3 candidate patches for different reserved-field
-          # layouts (1_2_3 / 3_4_5 / 6_7_8) — only one will apply cleanly against a
-          # given kernel source, so try each until one succeeds.
           DS_PATCH_BASE="https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12"
           DS_APPLIED=0
 
@@ -345,7 +316,6 @@ jobs:
             echo "::warning::No DroidSpace kABI fix patch applied cleanly — DroidSpace configs will still be added, but CONFIG_SYSVIPC/CONFIG_IPC_NS may break vendor module kABI on-device. Verify manually."
           fi
 
-          # kABI-safe GKI config fragment for DroidSpace support
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           # DroidSpace (Droidspaces-OSS) support
@@ -366,7 +336,6 @@ jobs:
         run: |
           CONFIG_FILE="./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           
-          # addon configs
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
           CONFIG_TCP_CONG_ADVANCED=y
@@ -386,8 +355,6 @@ jobs:
       - name: "Append custom Makefile line"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-         # echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-         # echo 'KBUILD_CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
          echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
          echo "Custom Makefile line added successfully"
     
@@ -433,15 +400,13 @@ jobs:
         run: |
           set -e
 
-          # Clone AnyKernel3
           git clone --depth=1 https://github.com/topnotchfreaks/AnyKernel3 -b YASK AnyKernel3
 
-          # Copy kernel images
           find ./artifacts -name "Image.*" -exec cp {} AnyKernel3/ \;
 
-          # Create banner
           cat > AnyKernel3/banner << 'EOF'
           AetherKernel
+          For Xiaomi Pad SE (xun)
           Maintainer: @Classity_Real
 
           Features:
@@ -453,33 +418,24 @@ jobs:
            • Metamodule Support
            • DroidSpace Support
 
-          Info:
-           • Supported Devices:
-             Topaz: Android 13 - 16
-             Tapas: Android 13 - 16
-             Sapphire: Android 13 - 16
-             Sapphiren: Android 13 - 16
-             Creek: Android 13 - 16
-             Xun: Android 13 - 16
+          Device:
+           • Xiaomi Pad SE (xun) — Android 13 - 16
 
           Managers:
            • BakaSU
 
           Please ensure:
-           • Your device is compatible
+           • You are on Xiaomi Pad SE (xun)
            • You have a backup of your current kernel
-           • Ensure you have a unlocked bootloader
+           • Bootloader is unlocked
           EOF
-          # Create ZIP
+
           ZIP_NAME="Anykernel3_AetherOfficial-BakaSU-AIO-FULL_$(date +'%Y-%m-%d').zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
           
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
-          # GitHub's Immutable Releases feature permanently locks a tag's assets
-          # once published — reusing a static tag_name across runs fails on the
-          # second and every subsequent run. Give each run its own dated tag.
           echo "RELEASE_TAG=AetherKernel-$(date +'%Y-%m-%d')-${{ github.run_number }}" >> $GITHUB_ENV
           echo "Package created: $ZIP_NAME"
 
@@ -496,8 +452,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          # Immutable Releases lock a release (and block asset uploads) the
-          # instant it's published — so the previous step creates it as a
-          # draft (mutable, assets attach fine) and this step publishes it
-          # only after the asset upload has already succeeded.
           gh release edit "${{ env.RELEASE_TAG }}" --draft=false --repo "${{ github.repository }}"
