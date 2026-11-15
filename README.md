@@ -6,7 +6,7 @@ Built with BakaSU and SUSFS, plus DroidSpace support.
 ## Device
 
 Xiaomi Pad SE (xun)  
-Android 13 through 16
+Android 13 through 17
 
 ## What you need
 
