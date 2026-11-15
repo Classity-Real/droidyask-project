@@ -2,19 +2,19 @@
   <img src="assets/homeworkdirartifactsaetherkernel_banner-1.png" alt="AetherKernel" width="100%" />
 </p>
 
-Custom kernel for Xiaomi Pad SE (xun).
+# AetherKernel: Based on BakaSU
+Custom kernel for Snapdragon 680 Devices.
 Built with BakaSU and SUSFS, plus DroidSpace support.
 
-## Device
-
-Xiaomi Pad SE (xun)  
-Android 13 through 17
+## Devices
+- Xiaomi Pad SE: Tested and working successfully
+- Other Snapdragon 680: Not Tested yet
 
 ## What you need
 
-- Xiaomi Pad SE
+- A Supported Device
 - Unlocked bootloader
-- TWRP
+- Lineage Recovery, or TWRP
 - ADB (if flashing from a PC)
 
 ## Install
@@ -28,11 +28,16 @@ Android 13 through 17
 
 Make a backup before flashing.
 
-## Credits
-
+## Credits 1: Regular
 - PhamtomK12 - original builder
-- ssocozy
-- NVG-064
+- ssocozy - idk... ;)
+- NVG-064 - idk... ;)
 - ShirkNeko - SUSFS
-- thewildjames - Wild-KSU
 - Classity_Real - DroidSpace integration
+### Credits 2: BakaSU 
+- [KernelSU](https://github.com/tiann/KernelSU): upstream
+- [SukiSU-Ultra/SukiSU-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra): fork source
+- [Kernel-Assisted Superuser](https://git.zx2c4.com/kernel-assisted-superuser/about/): The KernelSU idea.
+- [Magisk](https://github.com/topjohnwu/Magisk): The powerful root tool.
+- [genuine](https://github.com/brevent/genuine/): APK v2 signature validation.
+- [Diamorphine](https://github.com/m0nad/Diamorphine): Some rootkit skills.
