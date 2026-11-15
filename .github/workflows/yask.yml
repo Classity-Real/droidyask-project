@@ -157,115 +157,76 @@ jobs:
         if: matrix.kernel.enable_ksu == true
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-          rm -rf ./KernelSU ./KernelSU-Next ./drivers/kernelsu
+          set -e
+          rm -rf ./KernelSU ./KernelSU-Next ./drivers/kernelsu ./susfs4ksu
 
           echo "Installing BakaSU..."
-          curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/main/kernel/setup.sh" | bash
-
+          curl -fLSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/main/kernel/setup.sh" | bash
           echo "BakaSU installed successfully"
-          
-          echo "Cloning SUSFS4KSU for kernel patches..."
-          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
 
-          echo "Applying namespace.c Fake Patch (if applicable)"
-          if grep -q '^#include <trace/hooks/blk.h>$' fs/namespace.c; then
-            sed -i '\|^#include <trace/hooks/blk.h>$|d' fs/namespace.c
-            NS_FAKE_PATCHED=1
-          else
-            echo "blk.h include not present in fs/namespace.c — skipping fake patch"
-            NS_FAKE_PATCHED=0
-          fi
-
-          echo "Applying task_mmu.c Fake Patch (if applicable)"
-          if grep -q '^#include <trace/hooks/mm.h>$' fs/proc/task_mmu.c; then
-            sed -i '\|^#include <trace/hooks/mm.h>$|d' fs/proc/task_mmu.c
-            MM_FAKE_PATCHED=1
-          else
-            echo "mm.h include not present in fs/proc/task_mmu.c — skipping fake patch"
-            MM_FAKE_PATCHED=0
-          fi
-          
-          SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
-          
-          echo "Applying SUSFS kernel patch..."
-          if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
-            echo "SUSFS patch successfully applied"
-          else
-            echo "SUSFS patch failed — copying files manually"
-          fi
-
-          echo "Forcing SUSFS source injection..."
-          
-          mkdir -p fs
-          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
-          echo "Copied fs/susfs.c"
-          
-          mkdir -p include/linux
-          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
-          echo "Copied include/linux/susfs.h"
-          
-          if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
-            cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
-            echo "Copied include/linux/susfs_def.h"
-          else
-            echo "susfs_def.h not found in repo"
-          fi
-          
-          echo "Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
-            if [ -f "$f" ]; then echo "Found: $f"; else echo "Missing: $f"; fi
-          done
-          
-          rm -rf susfs4ksu
-          
           if [ ! -L "drivers/kernelsu" ]; then
             ln -sf ../KernelSU/kernel drivers/kernelsu
             echo "Created drivers/kernelsu symlink"
           fi
 
-          echo "SUSFS build wiring verified"
+          echo "Cloning SUSFS4KSU (gki-android13-5.15)..."
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
+
+          echo "Copying SUSFS sources and headers first..."
+          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
+          mkdir -p include/linux
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
+
+          echo "Applying SUSFS kernel patch (BakaSU uses built-in SUSFS support)..."
+          # Match coolzyd9107/GKI_BakaSU_SUSFS order: files first, then full patch
+          patch -p1 --forward < susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch || {
+            echo "::warning::SUSFS patch reported rejects — continuing with forced wiring"
+            true
+          }
+
+          # Guarantee critical wiring even if some hunks rejected
+          if ! grep -q 'susfs_def.h' fs/namespace.c; then
+            if grep -q '^#include "internal.h"$' fs/namespace.c; then
+              sed -i '/^#include "internal.h"$/a #include <linux/susfs_def.h>' fs/namespace.c
+            else
+              sed -i '1a #include <linux/susfs_def.h>' fs/namespace.c
+            fi
+            echo "Forced #include <linux/susfs_def.h> into fs/namespace.c"
+          fi
+
+          if ! grep -q 'obj-\$(CONFIG_KSU_SUSFS).*susfs\.o' fs/Makefile && ! grep -q 'susfs.o' fs/Makefile; then
+            echo 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' >> fs/Makefile
+            echo "Added susfs.o to fs/Makefile"
+          fi
+
+          echo "Verifying SUSFS files and defines..."
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+            if [ -f "$f" ]; then echo "Found: $f"; else echo "::error::Missing: $f"; exit 1; fi
+          done
+          grep -q 'DEFAULT_KSU_MNT_ID' include/linux/susfs_def.h
+          grep -q 'susfs_def.h' fs/namespace.c
+          echo "SUSFS wiring verified"
+
+          rm -rf susfs4ksu
 
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_MAP=y
-          EOF
+          # Ensure KSU + SUSFS configs (BakaSU Kconfig + SUSFS features)
+          grep -q '^CONFIG_KSU=y' "$CONFIG_FILE" || echo 'CONFIG_KSU=y' >> "$CONFIG_FILE"
+          {
+            echo 'CONFIG_KSU_SUSFS=y'
+            echo 'CONFIG_KSU_SUSFS_SUS_PATH=y'
+            echo 'CONFIG_KSU_SUSFS_SUS_MOUNT=y'
+            echo 'CONFIG_KSU_SUSFS_SUS_KSTAT=y'
+            echo 'CONFIG_KSU_SUSFS_SPOOF_UNAME=y'
+            echo 'CONFIG_KSU_SUSFS_ENABLE_LOG=y'
+            echo 'CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y'
+            echo 'CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y'
+            echo 'CONFIG_KSU_SUSFS_OPEN_REDIRECT=y'
+            echo 'CONFIG_KSU_SUSFS_SUS_MAP=y'
+          } >> "$CONFIG_FILE"
 
-          echo "Reverting namespace.c Fake Patch (if applicable)"
-          if [ "$NS_FAKE_PATCHED" = "1" ] && ! grep -q 'trace/hooks/blk.h' fs/namespace.c; then
-            if grep -q '^#include "internal.h"$' fs/namespace.c; then
-              sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
-              echo "Restored blk.h include"
-            else
-              echo "Anchor #include \"internal.h\" not found — could not restore blk.h include"
-            fi
-          else
-            echo "Skipping blk.h restore (not fake-patched or already present)"
-          fi
-
-          echo "Reverting task_mmu.c Fake Patch (if applicable)"
-          if [ "$MM_FAKE_PATCHED" = "1" ] && ! grep -q 'trace/hooks/mm.h' fs/proc/task_mmu.c; then
-            if grep -q '^#include <linux/pkeys.h>$' fs/proc/task_mmu.c; then
-              sed -i '\|^#include <linux/pkeys.h>$|a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
-              echo "Restored mm.h include"
-            else
-              echo "Anchor #include <linux/pkeys.h> not found — could not restore mm.h include"
-            fi
-          else
-            echo "Skipping mm.h restore (not fake-patched or already present)"
-          fi
-          
-          echo "KSU configs added"
-
-          echo "BakaSU installed and SUSFS for GKI android13-5.15 fully integrated!"
+          echo "BakaSU + SUSFS fully integrated for android13-5.15"
 
       - name: "Add DroidSpace Support"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
